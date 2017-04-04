@@ -1,0 +1,26 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="com.app.andrey_voroshkov.myapplication.com.example.andrey_voroshkov.chorus_laptimer.MainActivity">
+    <item
+        android:id="@+id/menuConnect"
+        android:title="Connect"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menuDisconnect"
+        android:title="Disconnect"
+        android:visible="false"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menuSaverace"
+        android:title="Save race"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menuSavepilot"
+        android:title="Save pilot"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menuLoadpilot"
+        android:title="Load pilot"
+        app:showAsAction="never" />
+  </menu>
