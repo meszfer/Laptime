@@ -171,7 +171,7 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         fos.close();
                     } catch (IOException e) {
-                        //e.printStackTrace();
+                        e.printStackTrace();
                     }
                 }
             }
