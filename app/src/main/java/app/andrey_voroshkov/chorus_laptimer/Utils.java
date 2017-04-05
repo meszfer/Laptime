@@ -1,5 +1,8 @@
 package app.andrey_voroshkov.chorus_laptimer;
 
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+
 /**
  * Created by Andrey_Voroshkov on 1/29/2017.
  */
@@ -26,6 +29,13 @@ public class Utils {
         int s = (int)Math.floor(ms/1000)-m*60;
         int msec = ms-(int)Math.floor(ms/1000)*1000;
         return String.format("%d : %02d . %03d", m, s, msec);
+    }
+
+    public static String convertMsToTime(int ms) {
+        int m = (int)Math.floor(ms/1000/60);
+        int s = (int)Math.floor(ms/1000)-m*60;
+        int msec = ms-(int)Math.floor(ms/1000)*1000;
+        return String.format("%d:%02d.%03d", m, s, msec);
     }
 
     public static String convertMsToSpeakableTime(int ms) {
@@ -141,5 +151,11 @@ public class Utils {
             AppState.getInstance().setNumberOfDevices(moduleId);
         }
         return result;
+    }
+
+    public static String getNowTimeString() {
+        Calendar now = Calendar.getInstance();
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
+        return format.format(now.getTimeInMillis());
     }
 }

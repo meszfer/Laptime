@@ -2,8 +2,16 @@ package app.andrey_voroshkov.chorus_laptimer;
 
 import android.media.AudioManager;
 import android.media.ToneGenerator;
+import android.os.Environment;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
 
 import app.akexorcist.bluetotohspp.library.BluetoothSPP;
 
@@ -563,6 +571,57 @@ public class AppState {
             if (!raceState.isStarted && !isRssiMonitorOn) {
                 sendBtCommand("R*V"); // turn RSSI Monitoring on
             }
+        }
+    }
+
+    public void savePilots() {
+        ArrayList<String> ada = new ArrayList<String>();
+        ada.add("Pilots list!\r\n");
+        for (DeviceState device : deviceStates){
+            ada.add(device.pilotName + ";" + device.band + ";" + device.channel + ";" + device.calibrationTime + ";" + device.calibrationValue + ";" + device.currentRSSI + "\r\n");
+        }
+        String filename ="Pilots_" + Utils.getNowTimeString() + ".txt";
+        saveToFile(ada, filename);
+    }
+
+    public void saveRaces() {
+        ArrayList<String> ada = new ArrayList<String>();
+        ada.add("Race results!\r\n");
+        for (int i = 0 ; i < deviceStates.size(); i++){
+            DeviceState device = deviceStates.get(i);
+            ada.add(device.pilotName + ";" + device.band + ";" + device.channel + ";" + device.calibrationTime + ";" + device.calibrationValue + ";" + device.currentRSSI + "\r\n");
+            StringBuffer sb = new StringBuffer();
+            for (LapResult lap : raceResults.get(i)){
+                sb.append(Utils.convertMsToTime(lap.getMs()) + ";");
+            }
+            sb.append("\r\n");
+            ada.add(sb.toString());
+        }
+        String filename ="Race_results_" + Utils.getNowTimeString() + ".txt";
+        saveToFile(ada, filename);
+    }
+
+    public String getNowTimeString() {
+        Calendar now = Calendar.getInstance();
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
+        return format.format(now.getTimeInMillis());
+    }
+
+    public void saveToFile(ArrayList<String> ada, String filename) {
+        try {
+            File file = new File(Environment.getExternalStorageDirectory() + File.separator + "LapTimerSave" + File.separator + filename);
+            file.createNewFile();
+            if(file.exists()){
+                OutputStream fos = new FileOutputStream(file);
+                for (String a : ada) {
+                    fos.write(a.getBytes(), 0, a.getBytes().length);
+                }
+                fos.flush();
+                fos.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println(e.toString());
         }
     }
 }

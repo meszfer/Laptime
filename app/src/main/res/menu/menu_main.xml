@@ -19,8 +19,4 @@
         android:id="@+id/menuSavepilot"
         android:title="Save pilot"
         app:showAsAction="never" />
-    <item
-        android:id="@+id/menuLoadpilot"
-        android:title="Load pilot"
-        app:showAsAction="never" />
   </menu>

@@ -17,6 +17,8 @@ import android.widget.Toast;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import app.akexorcist.bluetotohspp.library.BluetoothSPP;
 import app.akexorcist.bluetotohspp.library.BluetoothState;
@@ -150,36 +152,12 @@ public class MainActivity extends AppCompatActivity {
             if(bt.getServiceState() == BluetoothState.STATE_CONNECTED)
                 bt.disconnect();
         } else if(id == R.id.menuSaverace)  {
-            StringBuffer outStringBuf = new StringBuffer();
-            outStringBuf.append("Na lássuk mivan itt: ");
-            for (DeviceState device : AppState.getInstance().deviceStates){
-                outStringBuf.append(device.pilotName);
-            }
-            String filepath ="/mnt/sdcard/test.txt";
-            FileOutputStream fos = null;
-            try {
-                fos = new FileOutputStream(filepath);
-                byte[] buffer = outStringBuf.toString().getBytes();
-                fos.write(buffer, 0, buffer.length);
-                fos.close();
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                if(fos != null) {
-                    try {
-                        fos.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
+            AppState.getInstance().saveRaces();
         } else if(id == R.id.menuSavepilot)  {
-
-        } else if(id == R.id.menuLoadpilot)  {
-
-        }
+            AppState.getInstance().savePilots();
+        } /*else if(id == R.id.menuLoadpilot)  {
+            AppState.getInstance().loadPilots();
+        }*/
         return super.onOptionsItemSelected(item);
     }
 
