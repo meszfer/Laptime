@@ -24,7 +24,6 @@
             app:layout_scrollFlags="enterAlways"
             app:navigationIcon="@mipmap/ic_appbar"
             app:popupTheme="@style/AppTheme.PopupOverlay">
-
         </android.support.v7.widget.Toolbar>
 
         <android.support.design.widget.TabLayout

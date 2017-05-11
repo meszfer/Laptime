@@ -46,7 +46,7 @@ public class SectionsPagerAdapter extends FragmentPagerAdapter {
             case 3:
                 return "Race";
             case 4:
-                return "Race";
+                return "Scan";
         }
         return null;
     }

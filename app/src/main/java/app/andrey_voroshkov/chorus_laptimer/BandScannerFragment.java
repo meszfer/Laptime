@@ -1,21 +1,11 @@
 package app.andrey_voroshkov.chorus_laptimer;
 
-import android.app.ProgressDialog;
 import android.content.Context;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
 import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentPagerAdapter;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.ExpandableListView;
-
-import java.util.ArrayList;
-
 /**
  * Created by meszfer on 2017.05.11..
  */
@@ -23,5 +13,33 @@ import java.util.ArrayList;
 public class BandScannerFragment extends Fragment {
 
     private static final String ARG_SECTION_NUMBER = "section_number";
+    private View mRootView;
+    private Context mContext;
+
+    public BandScannerFragment() {
+
+    }
+    /**
+     * Returns a new instance of this fragment for the given section
+     * number.
+     */
+    public static BandScannerFragment newInstance(int sectionNumber) {
+        BandScannerFragment fragment = new BandScannerFragment();
+        Bundle args = new Bundle();
+        args.putInt(ARG_SECTION_NUMBER, sectionNumber);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        final View rootView = inflater.inflate(R.layout.race_setup, container, false);
+        mRootView = rootView;
+        mContext = getContext();
+//ide kéne a valami
+
+        return rootView;
+    }
 
 }
