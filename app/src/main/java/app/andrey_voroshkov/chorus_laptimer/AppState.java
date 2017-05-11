@@ -1,8 +1,11 @@
 package app.andrey_voroshkov.chorus_laptimer;
 
+import android.content.SharedPreferences;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Message;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -10,8 +13,6 @@ import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
 
 import app.akexorcist.bluetotohspp.library.BluetoothSPP;
 
@@ -20,21 +21,33 @@ import app.akexorcist.bluetotohspp.library.BluetoothSPP;
  */
 public class AppState {
     public static final byte DELIMITER = '\n';
+
     public static final int MIN_RSSI = 80;
     public static final int MAX_RSSI = 315;
     public static final int RSSI_SPAN = MAX_RSSI - MIN_RSSI;
     public static final int CALIBRATION_TIME_MS = 10000;
     public static final String bandNames [] = {"Race", "A", "B", "E", "F", "D"};
-    public static final int MIN_TIME_BEFORE_RACE_TO_SPEAK = 5; //seconds, don't speak "Prepare" message if less time is set
     public static final int DEFAULT_MIN_LAP_TIME = 5;
     public static final int DEFAULT_LAPS_TO_GO = 3;
 
+    //tone sounds and durations (race start, lap count, etc)
     public static final int TONE_PREPARE = ToneGenerator.TONE_DTMF_1;
     public static final int DURATION_PREPARE = 80;
     public static final int TONE_GO = ToneGenerator.TONE_DTMF_D;
     public static final int DURATION_GO = 600;
     public static final int TONE_LAP = ToneGenerator.TONE_DTMF_S;
     public static final int DURATION_LAP = 400;
+    public static final int MIN_TIME_BEFORE_RACE_TO_SPEAK = 5; //seconds, don't speak "Prepare" message if less time is set
+
+    //voltage measuring constants
+    public static final int BATTERY_CHECK_INTERVAL = 10000; // 10 seconds
+    public static final int BATTERY_WARN_INTERVAL = 60000; // 1 minute
+    public static final int BATTERY_WARN_DELAY = 5000; // 5 seconds (increase to prevent false alarms upon connection
+    public static final double VOLTAGE_LOW = 3.4;
+    public static final double VOLTAGE_HIGH = 4.2;
+    public static final double VOLTAGE_DIVIDER_CONSTANT = 11; //(10K + 1K)/1K
+    public static final double ARDUINO_VOLTAGE = 5;
+    public static final double ARDUINO_ANALOG_COUNTS = 1024;
 
     private static AppState instance = new AppState();
 
@@ -48,29 +61,64 @@ public class AppState {
 
     public BluetoothSPP bt;
     public TextSpeaker textSpeaker;
+    public SharedPreferences preferences;
 
     public int numberOfDevices = 0;
     public boolean isDeviceSoundEnabled = false;
     public boolean shouldSpeakLapTimes = true;
     public boolean shouldSpeakMessages = true;
     public boolean shouldSkipFirstLap = true;
+    public boolean wereDevicesConfigured = false;
     public boolean isRssiMonitorOn = false;
     public int timeToPrepareForRace = 5; //in seconds
     public RaceState raceState;
     public ArrayList<DeviceState> deviceStates;
     public ArrayList<ArrayList<LapResult>> raceResults;
+    public int batteryPercentage = 0;
+    public int lastVoltageReading = 0;
+    public double batteryVoltage = 0;
+    public int batteryAdjustmentConst = 1;
+    public boolean isLiPoMonitorEnabled = true;
+    public boolean isConnected = false;
 
     private ArrayList<Boolean> deviceTransmissionStates;
     private ArrayList<IDataListener> mListeners;
     private ToneGenerator mToneGenerator;
+    private Handler mBatteryMonitorHandler;
+    private Handler mBatteryNotifyHandler;
 
     private AppState() {
         mListeners = new ArrayList<IDataListener>();
-        raceState = new RaceState(false, DEFAULT_MIN_LAP_TIME, DEFAULT_LAPS_TO_GO);
         raceResults = new ArrayList<ArrayList<LapResult>>();
         deviceStates = new ArrayList<DeviceState>();
         deviceTransmissionStates = new ArrayList<Boolean>();
         mToneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, ToneGenerator.MAX_VOLUME);
+
+        mBatteryMonitorHandler = new Handler() {
+            public void handleMessage(Message msg) {
+                AppState app = AppState.getInstance();
+                if (app.isConnected && app.isLiPoMonitorEnabled && app.raceState != null && !app.raceState.isStarted) {
+                    AppState.getInstance().sendBtCommand("R*Y");
+                }
+                sendEmptyMessageDelayed(0, BATTERY_CHECK_INTERVAL);
+            }
+        };
+
+        mBatteryNotifyHandler = new Handler() {
+            public void handleMessage(Message msg) {
+                AppState app = AppState.getInstance();
+                if (app.isConnected && app.isLiPoMonitorEnabled) {
+                    if (batteryPercentage <= 10) {
+                        speakMessage("Device battery critical");
+                    } else if (batteryPercentage <= 20){
+                        speakMessage("Device battery low");
+                    }
+                }
+                sendEmptyMessageDelayed(0, BATTERY_WARN_INTERVAL);
+            }
+        };
+
+        raceState = new RaceState(false, DEFAULT_MIN_LAP_TIME, DEFAULT_LAPS_TO_GO);
     }
 
     public void addListener(IDataListener listener) {
@@ -135,13 +183,13 @@ public class AppState {
 
     public int getPilotPositionByBestLap(int deviceId) {
         int count = raceResults.size();
-        if (count <= deviceId) return -1;
+        if (count <= deviceId || !getIsPilotEnabled(deviceId)) return -1;
 
-        int myPosition = count;
+        int myPosition = getEnabledPilotsCount();
 
         int myBestLapId = getBestLapId(deviceId);
         for (int i = 0; i < count; i++ ) {
-            if (i != deviceId) {
+            if (i != deviceId && getIsPilotEnabled(i)) {
                 int curDeviceBestLapId = getBestLapId(i);
                 if (curDeviceBestLapId == -1) {
                     myPosition--;
@@ -159,15 +207,15 @@ public class AppState {
 
     public int getPilotPositionByTotalTime(int deviceId) {
         int count = raceResults.size();
-        if (count <= deviceId) return -1;
+        if (count <= deviceId || !getIsPilotEnabled(deviceId)) return -1;
 
-        int myPosition = count;
+        int myPosition = getEnabledPilotsCount();
 
         int myLapsCount = getValidRaceLapsCount(deviceId);
         int myTotalTime = getTotalRaceTime(deviceId);
 
         for (int i = 0; i < count; i++ ) {
-            if (i != deviceId) {
+            if (i != deviceId && getIsPilotEnabled(i)) {
                 int curDeviceLapsCount = getValidRaceLapsCount(i);
                 int curDeviceTotalTime = getTotalRaceTime(i);
                 if (myLapsCount > curDeviceLapsCount) {
@@ -286,6 +334,12 @@ public class AppState {
         return Integer.toString(deviceStates.get(deviceId).channel + 1);
     }
 
+    public Boolean getIsPilotEnabled(int deviceId) {
+        if (deviceStates == null) return false;
+        if (deviceStates.size() <= deviceId) return false;
+        return deviceStates.get(deviceId).isEnabled;
+    }
+
     public static int convertRssiToProgress(int rssi) {
         return rssi - MIN_RSSI;
     }
@@ -298,26 +352,53 @@ public class AppState {
     }
 
     public boolean areAllThresholdsSet() {
-        int count = deviceStates.size();
-        for (int i = 0; i< count; i++) {
-            if (deviceStates.get(i).threshold < MIN_RSSI) {
+        for(DeviceState ds: deviceStates) {
+            if (ds.threshold < MIN_RSSI && ds.isEnabled) {
                 return false;
             }
         }
         return true;
     }
 
+    public boolean areAllEnabledDevicesCalibrated() {
+        //no need to calibrate device for single enabled pilot
+        if (AppState.getInstance().getEnabledPilotsCount() == 1) {
+            return true;
+        }
+        for (DeviceState ds: deviceStates) {
+            if (!ds.isCalibrated && ds.isEnabled) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public int getEnabledPilotsCount() {
+        int count = deviceStates.size();
+        int result = 0;
+        for (int i = 0; i< count; i++) {
+            if (deviceStates.get(i).isEnabled) {
+                result++;
+            }
+        }
+        return result;
+    }
     //---------------------------------------------------------------------
     public void sendBtCommand(String cmd) {
+        if (bt == null) return;
         bt.send(cmd + (char)DELIMITER);
     }
 
     public void onConnected() {
+        isConnected = true;
         sendBtCommand("N0");
+        wereDevicesConfigured = false;
     }
 
     public void onDisconnected() {
+        isConnected = false;
         clearRssi();
+        clearVoltage();
         emitEvent(DataAction.DeviceRSSI);
     }
 
@@ -359,6 +440,7 @@ public class AppState {
         if (currentState.channel != channel) {
             currentState.channel = channel;
             emitEvent(DataAction.DeviceChannel);
+            AppPreferences.save(AppPreferences.DEVICE_CHANNELS);
         }
     }
 
@@ -370,6 +452,7 @@ public class AppState {
         if (currentState.band != band) {
             currentState.band = band;
             emitEvent(DataAction.DeviceBand);
+            AppPreferences.save(AppPreferences.DEVICE_BANDS);
         }
     }
 
@@ -381,7 +464,12 @@ public class AppState {
         if (!currentState.pilotName.equals(pilot)) {
             currentState.pilotName = pilot;
             emitEvent(DataAction.DevicePilot);
+            AppPreferences.save(AppPreferences.DEVICE_PILOTS);
         }
+    }
+
+    public void updatePilotNamesInEdits() {
+        emitEvent(DataAction.SPECIAL_DevicePilot_EditUpdate);
     }
 
     public void changeDeviceThreshold(int deviceId, int threshold) {
@@ -413,6 +501,7 @@ public class AppState {
         if (raceState.minLapTime!= minLapTime) {
             raceState.minLapTime = minLapTime;
             emitEvent(DataAction.RaceMinLap);
+            AppPreferences.save(AppPreferences.MIN_LAP_TIME);
         }
     }
 
@@ -423,6 +512,18 @@ public class AppState {
         if (raceState.lapsToGo!= laps) {
             raceState.lapsToGo = laps;
             emitEvent(DataAction.RaceLaps);
+            AppPreferences.save(AppPreferences.LAPS_TO_GO);
+        }
+    }
+
+    public void changeTimeToPrepareForRace(int time) {
+        if (time < 0) {
+            return;
+        }
+        if (timeToPrepareForRace != time) {
+            timeToPrepareForRace = time;
+            emitEvent(DataAction.PreparationTime);
+            AppPreferences.save(AppPreferences.PREPARATION_TIME);
         }
     }
 
@@ -439,11 +540,31 @@ public class AppState {
     public void changeDeviceSoundState(boolean isSoundEnabled) {
         this.isDeviceSoundEnabled = isSoundEnabled;
         emitEvent(DataAction.SoundEnable);
+        AppPreferences.save(AppPreferences.ENABLE_DEVICE_SOUNDS);
     }
 
     public void changeSkipFirstLap(boolean shouldSkip) {
-        this.shouldSkipFirstLap = shouldSkip;
-        emitEvent(DataAction.SkipFirstLap);
+        if (shouldSkipFirstLap != shouldSkip) {
+            shouldSkipFirstLap = shouldSkip;
+            emitEvent(DataAction.SkipFirstLap);
+            AppPreferences.save(AppPreferences.SKIP_FIRST_LAP);
+        }
+    }
+
+    public void changeShouldSpeakLapTimes(boolean shouldSpeak) {
+        if (shouldSpeakLapTimes != shouldSpeak) {
+            shouldSpeakLapTimes = shouldSpeak;
+            emitEvent(DataAction.SpeakLapTimes);
+            AppPreferences.save(AppPreferences.SPEAK_LAP_TIMES);
+        }
+    }
+
+    public void changeShouldSpeakMessages(boolean shouldSpeak) {
+        if (shouldSpeakMessages != shouldSpeak) {
+            shouldSpeakMessages = shouldSpeak;
+            emitEvent(DataAction.SpeakMessages);
+            AppPreferences.save(AppPreferences.SPEAK_MESSAGES);
+        }
     }
 
     /*
@@ -452,6 +573,10 @@ public class AppState {
      */
     public void addLapResult(int deviceId, int lapNumber, int lapTime) {
         if (deviceId >= numberOfDevices) {
+            return;
+        }
+        //don't track laps from disabled device
+        if (!deviceStates.get(deviceId).isEnabled) {
             return;
         }
         actualizeRaceResults();
@@ -468,7 +593,7 @@ public class AppState {
         deviceResults.get(lapNumber).setMs(lapTime);
         emitEvent(DataAction.LapResult);
 
-        if  (isDevicesInitializationOver()) {
+        if (isDevicesInitializationOver()) {
             playTone(TONE_LAP, DURATION_LAP);
             //speak lap times if initialization is over
             if (shouldSpeakLapTimes) {
@@ -530,7 +655,7 @@ public class AppState {
                 calibrationValue = baseTime/diff;
             }
             deviceStates.get(i).calibrationValue = calibrationValue;
-            sendBtCommand("C" + i + String.format("%08X", calibrationValue));
+            sendBtCommand("C" + String.format("%X", i) + String.format("%08X", calibrationValue));
         }
         emitEvent(DataAction.DeviceCalibrationValue);
     }
@@ -549,7 +674,11 @@ public class AppState {
 
     //use to determine if all devices reported their state after connection
     public boolean isDevicesInitializationOver() {
-        for (int i=0; i<deviceTransmissionStates.size(); i++) {
+        int count = deviceTransmissionStates.size();
+        if (count == 0) {
+            return false;
+        }
+        for (int i = 0; i < count; i++) {
             if (!deviceTransmissionStates.get(i)) {
                 return false;
             }
@@ -560,8 +689,8 @@ public class AppState {
     public void receivedEndOfSequence(int deviceId) {
         deviceTransmissionStates.set(deviceId, true);
 
-        //run or stop RSSI monitoring after connecction, only after all device states are received
         if (isDevicesInitializationOver()) {
+            //run or stop RSSI monitoring after connecction, only after all device states are received
             if (raceState == null) {
                 return;
             }
@@ -570,6 +699,101 @@ public class AppState {
             }
             if (!raceState.isStarted && !isRssiMonitorOn) {
                 sendBtCommand("R*V"); // turn RSSI Monitoring on
+            }
+            //also decide to apply preferences after all states are received
+            AppPreferences.applyInAppPreferences();
+
+            restartBatteryMonitoringHandlers();
+
+            if (!wereDevicesConfigured) {
+                AppPreferences.applyDeviceDependentPreferences();
+                wereDevicesConfigured = true;
+            }
+        }
+    }
+
+    public void suspendBatteryMonitoringHandlers() {
+        mBatteryMonitorHandler.removeMessages(0);
+        mBatteryNotifyHandler.removeMessages(0);
+    }
+
+    public void restartBatteryMonitoringHandlers() {
+        suspendBatteryMonitoringHandlers(); // this will remove pending messages to preserve messaging intervals
+        mBatteryMonitorHandler.sendEmptyMessageDelayed(0, 0);
+        mBatteryNotifyHandler.sendEmptyMessageDelayed(0, BATTERY_WARN_DELAY);
+    }
+
+    public void changeDeviceConfigStatus(int deviceId, boolean isConfigured) {
+        wereDevicesConfigured = wereDevicesConfigured || isConfigured;
+    }
+
+    public void changeDeviceEnabled(int deviceId, boolean isEnabled) {
+        if (deviceStates == null || deviceId >= deviceStates.size()) {
+            return;
+        }
+        //TODO: update the code so that the below check is not necessary (now it prevents endless loop(!))
+        // endless loop(!): click checkbox -> changeDeviceEnabled() -> emitEvent -> updateCheckbox -> changeDeviceEnabled()...
+        // probably there are more such places
+        if (deviceStates.get(deviceId).isEnabled == isEnabled) {
+            return;
+        }
+        deviceStates.get(deviceId).isEnabled = isEnabled;
+        emitEvent(DataAction.PilotEnabledDisabled);
+        AppPreferences.save(AppPreferences.DEVICE_ENABLED);
+    }
+
+    public void recalculateVoltage() {
+        if (!isLiPoMonitorEnabled) {
+            return;
+        }
+        //calc voltage and percentage
+        batteryVoltage = (double)lastVoltageReading * VOLTAGE_DIVIDER_CONSTANT * ARDUINO_VOLTAGE * (((double)batteryAdjustmentConst + 1000) / 1000) / ARDUINO_ANALOG_COUNTS;
+        int cellsCount = (int)(batteryVoltage/VOLTAGE_LOW);
+        double cellVoltage = batteryVoltage/cellsCount;
+        int percent = (int)((cellVoltage - VOLTAGE_LOW) * 100 / (VOLTAGE_HIGH - VOLTAGE_LOW));
+        percent = (percent > 130) ? 0 : (percent > 100) ? 100 : percent;
+        batteryPercentage = percent;
+        emitEvent(DataAction.BatteryVoltage);
+    }
+
+    public void changeVoltage(int voltageReading) {
+        if (!isLiPoMonitorEnabled) {
+            return;
+        }
+        lastVoltageReading = voltageReading;
+        recalculateVoltage();
+    }
+
+    public void clearVoltage() {
+        lastVoltageReading = 0;
+        recalculateVoltage();
+    }
+
+    public void changeAdjustmentConst(int adjConst) {
+        if (!isLiPoMonitorEnabled) {
+            return;
+        }
+        if (adjConst < -100 || adjConst > 100) {
+            return;
+        }
+        if (adjConst == batteryAdjustmentConst) {
+            return;
+        }
+        batteryAdjustmentConst = adjConst;
+        emitEvent(DataAction.VoltageAdjustmentConst);
+        AppPreferences.save(AppPreferences.LIPO_ADJUSTMENT_CONST);
+        recalculateVoltage();
+    }
+
+    public void changeEnableLiPoMonitor(boolean isEnabled) {
+        if (isLiPoMonitorEnabled != isEnabled) {
+            isLiPoMonitorEnabled = isEnabled;
+            emitEvent(DataAction.LiPoMonitorEnable);
+            AppPreferences.save(AppPreferences.LIPO_MONITOR_ENABLED);
+            if (isEnabled) {
+                restartBatteryMonitoringHandlers();
+            } else {
+                suspendBatteryMonitoringHandlers();
             }
         }
     }
@@ -592,7 +816,7 @@ public class AppState {
             ada.add(device.pilotName + ";" + device.band + ";" + device.channel + ";" + device.calibrationTime + ";" + device.calibrationValue + ";" + device.currentRSSI + "\r\n");
             StringBuffer sb = new StringBuffer();
             for (LapResult lap : raceResults.get(i)){
-                sb.append(Utils.convertMsToTime(lap.getMs()) + ";");
+                sb.append(Utils.convertMsToDisplayTime(lap.getMs()) + ";");
             }
             sb.append("\r\n");
             ada.add(sb.toString());

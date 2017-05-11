@@ -14,12 +14,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
 import app.akexorcist.bluetotohspp.library.BluetoothSPP;
 import app.akexorcist.bluetotohspp.library.BluetoothState;
 import app.akexorcist.bluetotohspp.library.DeviceList;
@@ -116,6 +110,9 @@ public class MainActivity extends AppCompatActivity {
 
         initBluetooth();
         AppState.getInstance().textSpeaker = new TextSpeaker(getApplicationContext());
+        AppState.getInstance().preferences = getPreferences(MODE_PRIVATE);
+        AppPreferences.applyAll();
+
     }
 
     public void onDestroy() {

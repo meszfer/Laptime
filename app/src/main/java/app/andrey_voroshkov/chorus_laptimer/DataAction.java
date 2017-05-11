@@ -19,5 +19,13 @@ public enum DataAction {
     DeviceBand,
     SkipFirstLap,
     RSSImonitorState,
-    DeviceRSSI
-};
+    DeviceRSSI,
+    SpeakMessages,
+    SpeakLapTimes,
+    PreparationTime,
+    PilotEnabledDisabled,
+    SPECIAL_DevicePilot_EditUpdate,
+    BatteryVoltage,
+    VoltageAdjustmentConst,
+    LiPoMonitorEnable
+}

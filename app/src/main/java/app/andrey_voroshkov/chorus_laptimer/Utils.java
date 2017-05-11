@@ -1,5 +1,8 @@
 package app.andrey_voroshkov.chorus_laptimer;
 
+import android.view.View;
+import android.view.ViewGroup;
+
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 
@@ -29,13 +32,6 @@ public class Utils {
         int s = (int)Math.floor(ms/1000)-m*60;
         int msec = ms-(int)Math.floor(ms/1000)*1000;
         return String.format("%d : %02d . %03d", m, s, msec);
-    }
-
-    public static String convertMsToTime(int ms) {
-        int m = (int)Math.floor(ms/1000/60);
-        int s = (int)Math.floor(ms/1000)-m*60;
-        int msec = ms-(int)Math.floor(ms/1000)*1000;
-        return String.format("%d:%02d.%03d", m, s, msec);
     }
 
     public static String convertMsToSpeakableTime(int ms) {
@@ -143,6 +139,16 @@ public class Utils {
                     result += "EndOfSequence. Device# " + moduleId;
                     AppState.getInstance().receivedEndOfSequence(moduleId);
                     break;
+                case 'P':
+                    int isDeviceConfigured = Integer.parseInt(chunk.substring(3,4), 16);
+                    result += "Device is configured: " + ((isDeviceConfigured!= 0) ? "yes" : "no");
+                    AppState.getInstance().changeDeviceConfigStatus(moduleId, (isDeviceConfigured!=0));
+                    break;
+                case 'Y':
+                    int voltageReading = Integer.parseInt(chunk.substring(3,7), 16);
+                    result += "Voltage(abstract): " + voltageReading;
+                    AppState.getInstance().changeVoltage(voltageReading);
+                    break;
             }
         } else if (dest == 'R') {
 
@@ -153,9 +159,22 @@ public class Utils {
         return result;
     }
 
+    public static void enableDisableView(View view, boolean enabled) {
+        view.setEnabled(enabled);
+
+        if ( view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup)view;
+
+            for ( int i = 0 ; i < group.getChildCount() ; i++ ) {
+                enableDisableView(group.getChildAt(i), enabled);
+            }
+        }
+    }
+
     public static String getNowTimeString() {
         Calendar now = Calendar.getInstance();
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
         return format.format(now.getTimeInMillis());
     }
+
 }

@@ -1,14 +1,18 @@
 package app.andrey_voroshkov.chorus_laptimer;
 
+import android.content.Context;
+import android.graphics.PorterDuff;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.support.v4.content.ContextCompat;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
-import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 public class RaceSetupFragment extends Fragment {
@@ -19,8 +23,10 @@ public class RaceSetupFragment extends Fragment {
     private static final String ARG_SECTION_NUMBER = "section_number";
 
     private View mRootView;
+    private Context mContext;
 
     public RaceSetupFragment() {
+
     }
 
     /**
@@ -40,8 +46,15 @@ public class RaceSetupFragment extends Fragment {
                              Bundle savedInstanceState) {
         final View rootView = inflater.inflate(R.layout.race_setup, container, false);
         mRootView = rootView;
+        mContext = getContext();
 
         updateText(rootView);
+        updateSkipFirstLapCheckbox(rootView);
+        updateSoundCheckbox(rootView);
+        updateSpeakLapTimesCheckbox(rootView);
+        updateSpeakMessagesCheckbox(rootView);
+        updateLiPoMonitorCheckbox(rootView);
+        updateBatteryProgressIndicator(rootView);
 
         AppState.getInstance().addListener(new IDataListener() {
             @Override
@@ -49,6 +62,8 @@ public class RaceSetupFragment extends Fragment {
                 switch (dataItemName) {
                     case RaceMinLap:
                     case RaceLaps:
+                    case PreparationTime:
+                    case VoltageAdjustmentConst:
                         updateText(rootView);
                         break;
                     case SoundEnable:
@@ -56,6 +71,19 @@ public class RaceSetupFragment extends Fragment {
                         break;
                     case SkipFirstLap:
                         updateSkipFirstLapCheckbox(rootView);
+                        break;
+                    case SpeakLapTimes:
+                        updateSpeakLapTimesCheckbox(rootView);
+                        break;
+                    case SpeakMessages:
+                        updateSpeakMessagesCheckbox(rootView);
+                        break;
+                    case BatteryVoltage:
+                        updateBatteryProgressIndicator(rootView);
+                        updateBatteryVoltageText(rootView);
+                        break;
+                    case LiPoMonitorEnable:
+                        updateLiPoMonitorCheckbox(rootView);
                         break;
                 }
             }
@@ -71,6 +99,27 @@ public class RaceSetupFragment extends Fragment {
         CheckBox chkSpeakLapTimes = (CheckBox) rootView.findViewById(R.id.chkSpeakLapTimes);
         CheckBox chkSpeakMessages = (CheckBox) rootView.findViewById(R.id.chkSpeakMessages);
         CheckBox chkDeviceSoundEnabled = (CheckBox) rootView.findViewById(R.id.chkDeviceSoundEnabled);
+        CheckBox chkLiPoMonitor = (CheckBox) rootView.findViewById(R.id.chkLiPoMonitor);
+        Button btnDecAdjust = (Button) rootView.findViewById(R.id.btnDecAdjustmentConst);
+        Button btnIncAdjust = (Button) rootView.findViewById(R.id.btnIncAdjustmentConst);
+        TextView txtVoltage = (TextView) rootView.findViewById(R.id.txtVoltage);
+        LinearLayout layoutVoltage = (LinearLayout) rootView.findViewById(R.id.layoutVoltage);
+
+        btnDecAdjust.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                int adj = AppState.getInstance().batteryAdjustmentConst;
+                AppState.getInstance().changeAdjustmentConst(adj - 1);
+            }
+        });
+
+        btnIncAdjust.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                int adj = AppState.getInstance().batteryAdjustmentConst;
+                AppState.getInstance().changeAdjustmentConst(adj + 1);
+            }
+        });
 
         btnDecMLT.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -105,18 +154,16 @@ public class RaceSetupFragment extends Fragment {
         btnDecPrepTime.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (AppState.getInstance().timeToPrepareForRace > 0) {
-                    AppState.getInstance().timeToPrepareForRace--;
-                    updateText(mRootView);
-                }
+                int time = AppState.getInstance().timeToPrepareForRace;
+                AppState.getInstance().changeTimeToPrepareForRace(time - 1);
             }
         });
 
         btnIncPrepTime.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                AppState.getInstance().timeToPrepareForRace++;
-                updateText(mRootView);
+                int time = AppState.getInstance().timeToPrepareForRace;
+                AppState.getInstance().changeTimeToPrepareForRace(time + 1);
             }
         });
 
@@ -151,18 +198,54 @@ public class RaceSetupFragment extends Fragment {
         chkSpeakLapTimes.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                AppState.getInstance().shouldSpeakLapTimes = isChecked;
+                AppState.getInstance().changeShouldSpeakLapTimes(isChecked);
             }
         });
 
         chkSpeakMessages.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                AppState.getInstance().shouldSpeakMessages = isChecked;
+                AppState.getInstance().changeShouldSpeakMessages(isChecked);
+            }
+        });
+
+        chkLiPoMonitor.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                AppState.getInstance().changeEnableLiPoMonitor(isChecked);
+            }
+        });
+
+        txtVoltage.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                toggleVoltageAdjustmentControls(rootView);
+                return false;
+            }
+        });
+
+        layoutVoltage.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                toggleVoltageAdjustmentControls(rootView);
+                return false;
             }
         });
 
         return rootView;
+    }
+
+    private void toggleVoltageAdjustmentControls(View rootView) {
+        boolean isEnabled = AppState.getInstance().isLiPoMonitorEnabled;
+        LinearLayout layout = (LinearLayout) rootView.findViewById(R.id.adjustmentLayout);
+        boolean isVisible = layout.getVisibility() == View.VISIBLE;
+        if (!isVisible) {
+            if (isEnabled) {
+                layout.setVisibility(View.VISIBLE);
+            }
+        } else {
+            layout.setVisibility(View.GONE);
+        }
     }
 
     private void updateText(View rootView) {
@@ -174,6 +257,9 @@ public class RaceSetupFragment extends Fragment {
 
         TextView txtPreparationTime = (TextView) rootView.findViewById(R.id.txtPreparationTime);
         txtPreparationTime.setText(Integer.toString(AppState.getInstance().timeToPrepareForRace) + " sec.");
+
+        TextView txtAdjustmentConst = (TextView) rootView.findViewById(R.id.txtAdjustmentConst);
+        txtAdjustmentConst.setText(Integer.toString(AppState.getInstance().batteryAdjustmentConst));
     }
 
     private void updateSkipFirstLapCheckbox(View rootView) {
@@ -184,5 +270,40 @@ public class RaceSetupFragment extends Fragment {
     private void updateSoundCheckbox(View rootView) {
         CheckBox chkDeviceSoundEnabled = (CheckBox) rootView.findViewById(R.id.chkDeviceSoundEnabled);
         chkDeviceSoundEnabled.setChecked(AppState.getInstance().isDeviceSoundEnabled);
+    }
+
+    private void updateSpeakLapTimesCheckbox(View rootView) {
+        CheckBox chkSpeakLapTimes = (CheckBox) rootView.findViewById(R.id.chkSpeakLapTimes);
+        chkSpeakLapTimes.setChecked(AppState.getInstance().shouldSpeakLapTimes);
+    }
+
+    private void updateSpeakMessagesCheckbox(View rootView) {
+        CheckBox chkSpeakMessages = (CheckBox) rootView.findViewById(R.id.chkSpeakMessages);
+        chkSpeakMessages.setChecked(AppState.getInstance().shouldSpeakMessages);
+    }
+
+    private void updateLiPoMonitorCheckbox(View rootView) {
+        boolean isEnabled = AppState.getInstance().isLiPoMonitorEnabled;
+        CheckBox chkLiPoMonitor = (CheckBox) rootView.findViewById(R.id.chkLiPoMonitor);
+        chkLiPoMonitor.setChecked(isEnabled);
+        LinearLayout layoutVoltage = (LinearLayout) rootView.findViewById(R.id.layoutVoltage);
+        layoutVoltage.setVisibility(isEnabled ? View.VISIBLE : View.GONE);
+        LinearLayout layoutAdjustment = (LinearLayout) rootView.findViewById(R.id.adjustmentLayout);
+        layoutAdjustment.setVisibility(View.GONE);
+    }
+
+    private void updateBatteryProgressIndicator(View rootView) {
+        ProgressBar bar = (ProgressBar) rootView.findViewById(R.id.batteryCharge);
+        int percent = AppState.getInstance().batteryPercentage;
+        bar.setProgress(percent);
+        int colorId = (percent > 10) ? (percent > 20) ? R.color.colorPrimary : R.color.colorWarn: R.color.colorAccent;
+        int color = ContextCompat.getColor(mContext, colorId);
+        bar.getProgressDrawable().setColorFilter(color, PorterDuff.Mode.SRC_IN);
+    }
+
+    private void updateBatteryVoltageText(View rootView) {
+        TextView txtVoltage = (TextView) rootView.findViewById(R.id.txtVoltage);
+        txtVoltage.setText(String.format("%.2f", AppState.getInstance().batteryVoltage) + "V");
+
     }
 }
