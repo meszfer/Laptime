@@ -7,7 +7,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 /**
- * Created by meszfer on 2017.05.11..
+ * Created by meszfer
  */
 
 public class BandScannerFragment extends Fragment {
@@ -32,13 +32,10 @@ public class BandScannerFragment extends Fragment {
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-        final View rootView = inflater.inflate(R.layout.race_setup, container, false);
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        final View rootView = inflater.inflate(R.layout.band_scanner, container, false);
         mRootView = rootView;
         mContext = getContext();
-//ide kéne a valami
-
         return rootView;
     }
 
