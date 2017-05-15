@@ -5,18 +5,10 @@
    android:orientation="vertical"
    android:animateLayoutChanges="true">
 
-   <LinearLayout
-       android:layout_width="match_parent"
-       android:layout_height="wrap_content"
-       android:orientation="horizontal"
-       android:background="@color/colorBatteryMonitor">
+       <com.github.mikephil.charting.charts.LineChart
+           android:id="@+id/chart"
+           android:layout_width="match_parent"
+           android:layout_height="match_parent" />
 
-       <TextView
-           android:id="@+id/probatextView"
-           android:layout_width="wrap_content"
-           android:layout_height="wrap_content"
-           android:text="Proba"
-           android:gravity="center_vertical"
-           android:textColor="?attr/colorControlNormal" />
-   </LinearLayout>
+
 </LinearLayout>
