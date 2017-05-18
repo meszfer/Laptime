@@ -12,7 +12,9 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.List;
 
 import app.akexorcist.bluetotohspp.library.BluetoothSPP;
 
@@ -29,6 +31,23 @@ public class AppState {
     public static final String bandNames [] = {"Race", "A", "B", "E", "F", "D"};
     public static final int DEFAULT_MIN_LAP_TIME = 5;
     public static final int DEFAULT_LAPS_TO_GO = 3;
+
+    public static final List<ChannelBandFreq> chbList = Arrays.asList(new ChannelBandFreq("D", 1, 5362), new ChannelBandFreq("D", 2, 5399), new ChannelBandFreq("D", 3, 5436),
+                                                    new ChannelBandFreq("D", 4, 5473), new ChannelBandFreq("D", 5, 5510), new ChannelBandFreq("D", 6, 5547),
+                                                    new ChannelBandFreq("D", 7, 5584), new ChannelBandFreq("D", 8, 5621), new ChannelBandFreq("E", 4, 5645),
+                                                    new ChannelBandFreq("Race", 1, 5658), new ChannelBandFreq("E", 3, 5665), new ChannelBandFreq("E", 2, 5685),
+                                                    new ChannelBandFreq("Race", 2, 5695), new ChannelBandFreq("E", 1, 5705), new ChannelBandFreq("A", 8, 5725),
+                                                    new ChannelBandFreq("Race", 3, 5732), new ChannelBandFreq("B", 1, 5733), new ChannelBandFreq("F",1,5740),
+                                                    new ChannelBandFreq("A", 7, 5745), new ChannelBandFreq("B", 2, 5752), new ChannelBandFreq("F",2,5760),
+                                                    new ChannelBandFreq("A", 6, 5765), new ChannelBandFreq("Race", 4, 5769), new ChannelBandFreq("B", 3, 5771),
+                                                    new ChannelBandFreq("F",3,5780),new ChannelBandFreq("A",5,5785),new ChannelBandFreq("B",4,5790),
+                                                    new ChannelBandFreq("F",4,5800),new ChannelBandFreq("A",4,5805),new ChannelBandFreq("Race",5,5806),
+                                                    new ChannelBandFreq("B", 5, 5809), new ChannelBandFreq("F",5,5820),new ChannelBandFreq("A",3,5825),
+                                                    new ChannelBandFreq("B", 6, 5828), new ChannelBandFreq("F",6,5840),new ChannelBandFreq("Race",6,5843),
+                                                    new ChannelBandFreq("A", 2, 5845), new ChannelBandFreq("B", 7, 5847), new ChannelBandFreq("F",7,5860),
+                                                    new ChannelBandFreq("A", 1, 5865), new ChannelBandFreq("B", 8, 5866), new ChannelBandFreq("Race", 7, 5880),
+                                                    new ChannelBandFreq("F",8,5880),new ChannelBandFreq("E",5,5885),new ChannelBandFreq("E",6,5905),
+                                                    new ChannelBandFreq("Race", 8, 5917), new ChannelBandFreq("E", 7, 5925), new ChannelBandFreq("E", 8, 5945));
 
     //tone sounds and durations (race start, lap count, etc)
     public static final int TONE_PREPARE = ToneGenerator.TONE_DTMF_1;

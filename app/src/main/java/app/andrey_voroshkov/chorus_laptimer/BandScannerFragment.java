@@ -5,10 +5,12 @@ import android.graphics.PorterDuff;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -17,9 +19,12 @@ import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.BarEntry;
+import com.github.mikephil.charting.interfaces.datasets.IBarDataSet;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static app.andrey_voroshkov.chorus_laptimer.AppState.chbList;
 
 
 /**
@@ -31,15 +36,9 @@ public class BandScannerFragment extends Fragment {
     private static final String ARG_SECTION_NUMBER = "section_number";
     private View mRootView;
     private Context mContext;
+    private BarDataSet dataSet;
+    private BarData barData;
 
-
-    protected BarChart mChart;
-    private SeekBar mSeekBarX, mSeekBarY;
-    private TextView tvX, tvY;
-
-    public BandScannerFragment() {
-
-    }
     /**
      * Returns a new instance of this fragment for the given section
      * number.
@@ -59,82 +58,89 @@ public class BandScannerFragment extends Fragment {
         mContext = getContext();
 
         BarChart chart = (BarChart) rootView.findViewById(R.id.chart);
-
-
-
-        DeviceState[] dataObjects =  new DeviceState[10];
-
-
         List<BarEntry> entries = new ArrayList<BarEntry>();
-        int i = 1;
-        int e = 10;
-        for (DeviceState data : dataObjects) {
 
-            // turn your data into Entry objects
+        for (ChannelBandFreq data : chbList) {
             // entries.add(new Entry(data.band, data.currentRSSI));
-            entries.add(new BarEntry(i, e));
-            i++;e+=10;
+            entries.add(new BarEntry((float) data.getFreq(), (float) 0));
         }
 
-        BarDataSet dataSet = new BarDataSet(entries, "Label"); // add entries to dataset
-        //dataSet.setColor(...);
-        //dataSet.setValueTextColor(...); // styling, ...
-
-        BarData barData = new BarData(dataSet);
+        dataSet = new BarDataSet(entries, "RSSI");
+        barData = new BarData(dataSet);
         chart.setData(barData);
         chart.invalidate(); // refresh
-
-
-//Beállítások
-//     5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917, // Raceband
-//     5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725, // Band A
-//     5733, 5752, 5771, 5790, 5809, 5828, 5847, 5866, // Band B
-//     5705, 5685, 5665, 5645, 5885, 5905, 5925, 5945, // Band E
-//     5740, 5760, 5780, 5800, 5820, 5840, 5860, 5880, // Band F / Airwave
-//     5362, 5399, 5436, 5473, 5510, 5547, 5584, 5621 // Band D / 5.3
-
-
-        //létetés lefelé cs
-                AppState.getInstance().sendBtCommand("R" + deviceId + "c");
-        //léptetés felfelé cs
-                AppState.getInstance().sendBtCommand("R" + deviceId + "C");
-        //létetés lefelé b
-                AppState.getInstance().sendBtCommand("R" + deviceId + "b");
-        //léptetés felfelé b
-                AppState.getInstance().sendBtCommand("R" + deviceId + "B");
-
-//visszaadja a beállított értékeket
-        AppState.getInstance().getChannelText(position);
-        AppState.getInstance().getBandText(position);
-
-
-//rssi beállítás
- /*
-        ProgressBar bar = (ProgressBar) mRootView.findViewById(R.id.rssiBar);
-        TextView txt = (TextView) mRootView.findViewById(R.id.txtRssi);
-        int curRssi = AppState.getInstance().getCurrentRssi(i);
-        int rssiThreshold = AppState.getInstance().getRssiThreshold(i);
-        bar.setProgress(AppState.convertRssiToProgress(curRssi));
-        int colorId = (curRssi > rssiThreshold) ? R.color.colorAccent : R.color.colorPrimary;
-        int color = ContextCompat.getColor(mContext, colorId);
-        bar.getProgressDrawable().setColorFilter(color, PorterDuff.Mode.SRC_IN);
-        txt.setText(Integer.toString(curRssi));*/
-// no és ez lesz
-
-        //0 az első vevő
-        int position = 0;
-        final String deviceId = String.format("%X", position);
-        int curRssi = AppState.getInstance().getCurrentRssi(i);
-        for (int cs = 0; cs < 5; cs++){
-            AppState.getInstance().getCurrentRssi(position);
-            for (int b = 0; b < 7; b++){
-                AppState.getInstance().sendBtCommand("R" + deviceId + "B");
-                AppState.getInstance().getCurrentRssi(position);
+        Log.d("Laptimer","I am here");
+        AppState.getInstance().addListener(new IDataListener() {
+            @Override
+            public void onDataChange(DataAction dataItemName) {
+                switch (dataItemName) {
+                    case NDevices:
+                    case DeviceBand:
+                    case DeviceChannel:
+                    case DeviceRSSI:
+                        updateCurrentRSSI();
+                        break;
+                }
             }
-            AppState.getInstance().sendBtCommand("R" + deviceId + "C");
-        }
+        });
         return rootView;
     }
 
+    public void updateCurrentRSSI() {
+        BarChart chart = (BarChart) mRootView.findViewById(R.id.chart);
+        int position = 0;
+        final String deviceId = String.format("%X", position);
 
+        //lekérem mi érkezett
+        String bschannel = AppState.getInstance().getChannelText(position);
+        int bsband = Integer.parseInt(AppState.getInstance().getBandText(position));
+        int bsindex = getChannelBandIndex(bschannel, bsband);
+/*
+        IBarDataSet barDataSet = chart.getData().getDataSetByIndex(0);
+        BarEntry bsbe = barDataSet.getEntryForIndex(bsindex);
+
+        bsbe.setY(AppState.getInstance().getCurrentRssi(0));
+        barDataSet.addEntry(bsbe);
+
+        chart.notifyDataSetChanged();
+        chart.invalidate();
+
+        //utolsó esetén csatornát is váltani kell
+        if (bsband == 7){
+            AppState.getInstance().sendBtCommand("R" + deviceId + "C");
+        }
+        AppState.getInstance().sendBtCommand("R" + deviceId + "B");
+*/
+        Log.d("Laptimer","I am here");
+
+
+
+        BarEntry be = dataSet.getEntryForIndex(bsindex);
+        be.setY(100);
+
+        //be.setY(AppState.getInstance().getCurrentRssi(0));
+        dataSet.removeEntry(bsindex);
+        barData.addEntry(be, bsindex);
+        barData.notifyDataChanged(); // NOTIFIES THE DATA OBJECT
+        chart.setData(barData);
+        chart.notifyDataSetChanged(); // let the chart know it's data changed
+        chart.invalidate(); // refresh
+
+        //utolsó esetén csatornát is váltani kell
+        if (bsband == 7){
+            AppState.getInstance().sendBtCommand("R" + deviceId + "C");
+        }
+        AppState.getInstance().sendBtCommand("R" + deviceId + "B");
+    }
+
+    public int getChannelBandIndex(String ch, int band){
+        int index = 0;
+        for ( ChannelBandFreq i : chbList ) {
+            if (i.getChannel().equals(ch) && i.getBand() == band){
+                return index;
+            }
+            index++;
+        }
+        return -1;
+    }
 }
